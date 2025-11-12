@@ -109,10 +109,10 @@ function MapContainer() {
             newMarkers.push(marker)
 
             kakao.maps.event.addListener(marker, 'click', () => {
-                map.panTo(position)
-
                 infoWindowRef.current.setContent(`<div style="padding: 5px; font-size: 12px;">${place.place_name}</div>`)
                 infoWindowRef.current.open(map, marker)
+
+                map.panTo(position)
             })
 
             bounds.extend(position)
@@ -126,10 +126,10 @@ function MapContainer() {
     const handlePlaceClick = (place) => {
         const position = new kakao.maps.LatLng(place.y, place.x)
 
-        map.panTo(position)
-
         infoWindowRef.current.setContent(`<div style="padding: 5px; font-size: 12px;">${place.place_name}</div>`)
         infoWindowRef.current.open(map, new kakao.maps.Marker({ position, map }))
+
+        map.panTo(position)
     }
 
     const handleOpenModal = (place) => {
