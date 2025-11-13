@@ -3,7 +3,7 @@ import MyList from "./MyList.jsx"
 import Roulette from "./Roulette.jsx"
 import MapContainer from "./MapContainer.jsx"
 import { auth, db } from "./firebase"
-import { addDoc, arrayUnion, collection, doc, getDoc, setDoc, updateDoc } from "firebase/firestore"
+import { addDoc, arrayUnion, collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from "firebase/firestore"
 import { v4 as uuidv4 } from "uuid"
 
 const SearchPanel = ({ places, onPlaceClick, onOpenModal }) => {
@@ -134,32 +134,93 @@ const LocationManager = ({ onTagClick }) => {
     const [isModalOpen, setIsModalOpen] = useState(false)
 
     useEffect(() => {
-        const fetchLocations = async () => {
+        const fetchLocationsAndCounts = async () => {
             if (!auth.currentUser) return
-            const userRef = doc(db, "Users", auth.currentUser.uid)
-            const userSnap = await getDoc(userRef)
 
-            if (userSnap.exists() && userSnap.data().locations) {
-                const sortedLocations = userSnap.data().locations.sort((a, b) => a.order - b.order)
-                setLocations(sortedLocations)
+            try {
+                const menuListQuery = query(
+                    collection(db, "MyMenuList"),
+                    where("user_id", "==", auth.currentUser.uid)
+                )
+                const menuListSnap = await getDocs(menuListQuery)
+
+                const tagCounts = {}
+                menuListSnap.forEach(doc => {
+                    const tag = doc.data().location_tag
+                    if (tag) {
+                        tagCounts[tag] = (tagCounts[tag] || 0) + 1
+                    }
+                })
+
+                const userRef = doc(db, "Users", auth.currentUser.uid)
+                const userSnap = await getDoc(userRef)
+
+                if (userSnap.exists() && userSnap.data().locations) {
+                    const userLocations = userSnap.data().locations
+                    const combinedLocations = userLocations.map(loc => ({
+                        ...loc,
+                        count: tagCounts[loc.name] || 0
+                    }))
+                    const sortedLocations = combinedLocations.sort((a, b) => a.order - b.order)
+                    setLocations(sortedLocations)
+                } else {
+                    setLocations([])
+                }
+            } catch (error) {
+                console.error("거점 목록 또는 MyList 개수 불러오기 실패: ", error)
             }
         }
-        fetchLocations()
+        fetchLocationsAndCounts()
+        // 메모
+        // TODO: Firestore 'locations'가 변경될 때 실시간으로 업데이트하려면
+        // onSnapshot 리스너를 사용하는 것을 고려해볼 수 있습니다.
     }, [])
 
     const renderManagementModal = () => {
         if (!isModalOpen) return null
 
         return (
-            <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'white', border: '1px solid black', padding: '20px', zIndex: 100 }}>
-                <h2>거점 태그 관리</h2>
-                <p>
+            <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '400px', background: 'white', border: '1px solid #ccc',
+                        borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 100 }}>
+                <h2 style={{ padding: '15px 20px', margin: 0, borderBottom: '1px solid #eee', fontSize: '18px',
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                >
+                    거점 태그 관리
+                    <button onClick={() => setIsModalOpen(false)}
+                        style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#555' }}>
+                        &times;
+                    </button>
+                </h2>
 
-                </p>
-                <p></p>
-                <p></p>
-                <p></p>
-                <button onClick={() => setIsModalOpen(false)}>닫기</button>
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: '400px', overflowY: 'auto'}}>
+                    {locations.map(loc => (
+                        <li key={loc.id} style={{ display: 'flex', alignItems: 'center', padding: '15px 20px', borderBottom: '1px solid #eee'}}>
+                            <div style={{ flex: 1, marginRight: '10px' }}>
+                                <strong style={{ fontSize: '16px'}}>
+                                    {loc.name} ({loc.count}개)
+                                </strong>
+                                <p style={{ fontSize: '12px', color: 'gray', margin: '4px 0 0 0' }}>
+                                    {loc.address || "위치 미설정"}
+                                </p>
+                            </div>
+                            <button onClick={() => console.log("수정 클릭: ", loc)}
+                                style={{ fontSize: '12px', padding: '4px 8px', marginRight: '5px' }}>
+                                수정
+                            </button>
+                            <button onClick={() => console.log("삭제 클릭: ", loc)}
+                                style={{ fontSize: '12px', padding: '4px 8px', marginRight: '10px', color: 'red', borderColor: 'red' }}>
+                                삭제
+                            </button>
+                            <span style={{ fontSize: '18px', cursor: 'grab'}}>☰</span>
+                        </li>
+                    ))}
+                </ul>
+
+                <div style={{ padding: '15px 20px', borderTop: '1px solid #eee' }}>
+                    <button onClick={() => console.log("새 거점 추가 클릭")} style={{ width: '100%', padding: '10px', fontSize: '16px' }}>
+                        +
+                    </button>
+                </div>
             </div>
         )
     }
