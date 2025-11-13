@@ -4,6 +4,7 @@ import Roulette from "./Roulette.jsx"
 import MapContainer from "./MapContainer.jsx"
 import { auth, db } from "./firebase"
 import { addDoc, arrayUnion, collection, doc, getDoc, setDoc, updateDoc } from "firebase/firestore"
+import { v4 as uuidv4 } from "uuid"
 
 const SearchPanel = ({ places, onPlaceClick, onOpenModal }) => {
     if (!places || places.length === 0) {
@@ -38,8 +39,10 @@ const SaveModal = ({ place, isOpen, onClose, onSave }) => {
             const fetchUserTags = async () => {
                 const userRef = doc(db, "Users", auth.currentUser.uid)
                 const userSnap = await getDoc(userRef)
-                if (userSnap.exists() && userSnap.data().tags) {
-                    setUserTags(userSnap.data().tags)
+                if (userSnap.exists() && userSnap.data().locations) {
+                    const locations = userSnap.data().locations
+                    const tagNames = locations.map(loc => loc.name)
+                    setUserTags(tagNames)
                 } else {
                     setUserTags([])
                 }
@@ -54,6 +57,9 @@ const SaveModal = ({ place, isOpen, onClose, onSave }) => {
             return
         }
 
+        setMenuName("")
+        setLocationTag("")
+        setMemo("")
         onSave(menuName, locationTag, memo)
     }
 
@@ -189,6 +195,11 @@ function MainApp({ onLogout }) {
         const place = modalPlaceData
         const tag = locationTag.trim()
 
+        if (!tag) {
+            alert("태그를 입력하거나 선택해주세요!")
+            return
+        }
+
         try {
             await setDoc(doc(db, "Shops", place.id), {
                 shop_id: place.id,
@@ -202,15 +213,34 @@ function MainApp({ onLogout }) {
                 user_id: auth.currentUser.uid,
                 shop_id: place.id,
                 menu_name: menuName,
-                location_tag: locationTag,
+                location_tag: tag,
                 memo: memo,
                 created_at: new Date()
             })
 
             const userRef = doc(db, "Users", auth.currentUser.uid)
-            await updateDoc(userRef, {
-                tags: arrayUnion(tag)
-            })
+            const userSnap = await getDoc(userRef)
+            const locations = userSnap.exists() && userSnap.data().locations ? userSnap.data().locations : []
+
+            const tagExists = locations.some(loc => loc.name === tag)
+
+            if (!tagExists) {
+                const newLocation = {
+                    id: uuidv4(),
+                    name: tag,
+                    lat: null,
+                    lng: null,
+                    address: null,
+                    order: locations.length
+                }
+
+                await updateDoc(userRef, {
+                    locations: arrayUnion(newLocation)
+                })
+                console.log("새로운 거점 태그 객체를 추가했습니다.", newLocation)
+            } else {
+                console.log("이미 존재하는 태그 이름입니다.")
+            }
 
             alert("저장 완료!")
             handleCloseModal()

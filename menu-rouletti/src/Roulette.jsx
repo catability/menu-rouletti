@@ -13,8 +13,10 @@ function Roulette() {
         const fetchUserTags = async () => {
             if (!auth.currentUser) return
             const userSnap = await getDoc(doc(db, "Users", auth.currentUser.uid))
-            if (userSnap.exists() && userSnap.data().tags) {
-                setUserTags(userSnap.data().tags)
+            if (userSnap.exists() && userSnap.data().locations) {
+                const locations = userSnap.data().locations
+                const tagNames = locations.map(loc => loc.name)
+                setUserTags(tagNames)
             }
         }
         fetchUserTags()
