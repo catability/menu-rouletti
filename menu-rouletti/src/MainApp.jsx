@@ -6,25 +6,50 @@ import { auth, db } from "./firebase"
 import { addDoc, arrayUnion, collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from "firebase/firestore"
 import { v4 as uuidv4 } from "uuid"
 
-const SearchPanel = ({ places, onPlaceClick, onOpenModal }) => {
-    if (!places || places.length === 0) {
-        return <div style={{ padding: '20px', textAlign: 'center', color: 'gray' }}>검색 결과가 없습니다.</div>
+const SearchPanel = ({ places, onPlaceClick, onOpenModal, onSearch }) => {
+    const [inputText, setInputText] = useState("")
+
+    const handleSearchClick = () => {
+        if (!inputText.trim()) {
+            alert("검색어를 입력해주세요!")
+            return
+        }
+        onSearch(inputText)
     }
 
     return (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {places.map((place, index) => (
-                <li key={index} style={{ padding: '10px 15px', borderBottom: '1px solid #eee' }}>
-                    <div onClick={() => onPlaceClick(place)} style={{ cursor: 'pointer' }}>
-                        <strong style={{ fontSize: '16px' }}>{place.place_name}</strong>
-                        <p style={{ fontSize: '12px', color: 'gray', margin: '5px 0 0 0' }}>{place.address_name}</p>
-                    </div>
-                    <button onClick={() => onOpenModal(place)} style={{ marginTop: '5px', padding: '3px 8px', fontSize: '12px' }}>
-                        My List 저장
-                    </button>
-                </li>
-            ))}
-        </ul>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <div style={{ padding: '10px', borderBottom: '1px solid #eee', display: 'flex', gap: '5px' }}>
+                <input
+                    placeholder="맛집 검색 (예: 강남역 돈까스)"
+                    style={{ width: '100%', padding: '8px', boxSizing: 'border-box'}}
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    onKeyUp={(e) => e.key === 'Enter' && handleSearchClick()}
+                />
+                <button onClick={handleSearchClick} style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>검색</button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto'}}>
+                {(!places || places.length === 0) ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: 'gray' }}>검색 결과가 없습니다.</div>
+                ) : (
+                    <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                        {places.map((place, index) => (
+                            <li key={index} style={{ padding: '10px 15px', borderBottom: '1px solid #eee' }}>
+                                <div onClick={() => onPlaceClick(place)} style={{ cursor: 'pointer' }}>
+                                    <strong style={{ fontSize: '16px' }}>{place.place_name}</strong>
+                                    <p style={{ fontSize: '12px', color: 'gray', margin: '5px 0 0 0' }}>{place.address_name}</p>
+                                </div>
+                                <button onClick={() => onOpenModal(place)} style={{ marginTop: '5px', padding: '3px 8px', fontSize:' 12px' }}>
+                                    My List 저장
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+        </div>
     )
 }
 
@@ -252,7 +277,6 @@ function MainApp({ onLogout }) {
     const [currentTab, setCurrentTab] = useState('search')
     const [isScriptLoaded, setIsScriptLoaded] = useState(false)
 
-    const [inputText, setInputText] = useState("")
     const [places, setPlaces] = useState([])
     const [selectedPlace, setSelectedPlace] = useState(null)
 
@@ -273,14 +297,15 @@ function MainApp({ onLogout }) {
         }
     }, [])
 
-    const handleSearch = () => {
-        if (!inputText.trim()) {
+    const handleSearch = (searchText) => {
+        if (!isScriptLoaded) return
+        if (!searchText.trim()) {
             alert("검색어를 입력해주세요!")
             return
         }
 
         const ps = new kakao.maps.services.Places()
-        ps.keywordSearch(inputText, (data, status, pagination) => {
+        ps.keywordSearch(searchText, (data, status, pagination) => {
             if (status === kakao.maps.services.Status.OK) {
                 console.log("검색 결과: ", data)
                 setPlaces(data)
@@ -377,6 +402,7 @@ function MainApp({ onLogout }) {
                         places={places}
                         onPlaceClick={handleSelectPlace}
                         onOpenModal={handleOpenModal}
+                        onSearch={handleSearch}
                     />
                 )
             case 'mylist':
@@ -384,7 +410,7 @@ function MainApp({ onLogout }) {
             case 'roulette':
                 return <Roulette />
             default:
-                return <SearchPanel places={places} onPlaceClick={handleSelectPlace} onOpenModal={handleOpenModal}/>
+                return <SearchPanel places={places} onPlaceClick={handleSelectPlace} onOpenModal={handleOpenModal} onSearch={handleSearch}/>
         }
     }
 
@@ -402,15 +428,7 @@ function MainApp({ onLogout }) {
 
                 {/* 검색창 + 탭 버튼 */}
                 <div style={{ padding: '10px'}}>
-                    <input
-                        placeholder="맛집 검색 (예: 강남역 돈까스)"
-                        style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
-                        value={inputText}
-                        onChange={(e) => setInputText(e.target.value)}
-                        onKeyUp={(e) => e.key === 'Enter' && handleSearch()}
-                    />
-
-                    <div style={{ display: 'flex', marginTop: '10px', gap: '5px' }}>
+                    <div style={{ display: 'flex', gap: '5px' }}>
                         <button onClick={() => setCurrentTab('search')} style={getTabStyle(currentTab === 'search')}>검색</button>
                         <button onClick={() => setCurrentTab('mylist')} style={getTabStyle(currentTab === 'mylist')}>My List</button>
                         <button onClick={() => setCurrentTab('roulette')} style={getTabStyle(currentTab === 'roulette')}>룰렛</button>
