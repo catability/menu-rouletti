@@ -2,14 +2,12 @@ import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth"
 import { auth, provider, db } from "./firebase.js"
 import { doc, getDoc, setDoc } from "firebase/firestore"
 import { useEffect, useState } from "react"
-import MapContainer from "./MapContainer.jsx"
-import MyList from "./MyList.jsx"
-import Roulette from "./Roulette.jsx"
+import LoginPage from "./LoginPage.jsx"
+import MainApp from "./MainApp.jsx"
 
 function App() {
   const [user, setUser] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [currentTab, setCurrentTab] = useState("home")
   
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -50,46 +48,15 @@ function App() {
   }
 
   if (isLoading) {
-    // return <div>잠시만 기다려 주세요... (로딩 중)</div>
+    // return <div>로딩 중...</div>
     return <></>
   }
 
-  return (
-    <div>
-      {user ? (
-        <>
-          {/* 상단 네비게이션 바 */}
-          <header style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', background: '#eee' }}>
-            <div>
-              <button onClick={() => setCurrentTab("home")}>지도 홈</button>
-              <button onClick={() => setCurrentTab("mylist")}>My List</button>
-              <button onClick={() => setCurrentTab("roulette")}>룰렛</button>
-            </div>
-            <div>
-              <span>{user.displayName}님</span>
-              <button onClick={handleLogout}>로그아웃</button>
-            </div>
-          </header>
+  if (!user) {
+    return <LoginPage onGoogleLogin={handleLogin} />
+  }
 
-          {/* 탭에 따른 화면 표시 */}
-          <main>
-            {currentTab === "home" && <MapContainer />}
-            {currentTab === "mylist" && <MyList />}
-            {currentTab === "roulette" && <Roulette />}
-          </main>
-        </>
-      ) : (
-        <div>
-          <h2>로그인이 필요합니다.</h2>
-          <div style={{ textAlign: "center", marginTop: "50px" }}>
-            <h1>룰렛</h1>
-            <button onClick={handleLogin} style={{ padding: "10px 20px", fontSize: "16px" }}>google로 로그인</button>
-          </div>
-        </div>
-        // <Login />
-      )}
-    </div>
-  )
+  return <MainApp currentUser={user} onLogout={handleLogout} />
 }
 
 export default App
