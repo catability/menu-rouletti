@@ -129,18 +129,62 @@ const SaveModal = ({ place, isOpen, onClose, onSave }) => {
     )
 }
 
-const LocationTags = () => {
+const LocationManager = ({ onTagClick }) => {
+    const [locations, setLocations] = useState([])
+    const [isModalOpen, setIsModalOpen] = useState(false)
+
+    useEffect(() => {
+        const fetchLocations = async () => {
+            if (!auth.currentUser) return
+            const userRef = doc(db, "Users", auth.currentUser.uid)
+            const userSnap = await getDoc(userRef)
+
+            if (userSnap.exists() && userSnap.data().locations) {
+                const sortedLocations = userSnap.data().locations.sort((a, b) => a.order - b.order)
+                setLocations(sortedLocations)
+            }
+        }
+        fetchLocations()
+    }, [])
+
+    const renderManagementModal = () => {
+        if (!isModalOpen) return null
+
+        return (
+            <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'white', border: '1px solid black', padding: '20px', zIndex: 100 }}>
+                <h2>거점 태그 관리</h2>
+                <p>
+
+                </p>
+                <p></p>
+                <p></p>
+                <p></p>
+                <button onClick={() => setIsModalOpen(false)}>닫기</button>
+            </div>
+        )
+    }
+
     return (
-        <div style={{ position: 'absolute', top: '20px', left: '370px', zIndex: 11, background: 'white', padding: '5px 10px',
-            borderRadius: '20px', boxShadow: '0 2px 5px rgba(0,0,0,0.2)', display: 'flex', gap: '5px' }}>
-            <button>집</button>
-            <button>회사</button>
-            <button>학교</button>
-            <button>+</button>
-        </div>
+        <>
+            <div style={{
+                position: 'absolute', top: '20px', left: '370px', zIndex: 11,
+                background: 'white', padding: '5px 10px', borderRadius: '20px',
+                boxShadow: '0 2px 5px rgba(0,0,0,0.2)', display: 'flex', gap: '5px'
+            }}>
+                {locations.map(loc => (
+                    <button key={loc.id} onClick={() => onTagClick(loc)}>
+                        {loc.name}
+                    </button>
+                ))}
+                <button onClick={() => setIsModalOpen(true)} style={{ fontWeight: 'bold', padding: '0 8px'}}>
+                    ☰
+                </button>
+            </div>
+
+            {renderManagementModal()}
+        </>
     )
 }
-
 
 function MainApp({ onLogout }) {
     // ('search', 'mylist', 'roulette')
@@ -328,7 +372,7 @@ function MainApp({ onLogout }) {
             </div>
 
             {/* 거점 태그 */}
-            <LocationTags />
+            <LocationManager onTagClick={(loc) => console.log("선택된 거점: ", loc)}/>
 
             {/* 로그아웃 버튼 */}
             <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 11, background: 'white',
