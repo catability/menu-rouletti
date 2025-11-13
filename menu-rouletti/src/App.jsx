@@ -56,7 +56,7 @@ function App() {
     return <LoginPage onGoogleLogin={handleLogin} />
   }
 
-  return <MainApp currentUser={user} onLogout={handleLogout} />
+  return <MainApp onLogout={handleLogout} />
 }
 
 export default App

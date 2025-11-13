@@ -5,7 +5,7 @@ import MapContainer from "./MapContainer.jsx"
 import { auth, db } from "./firebase"
 import { addDoc, arrayUnion, collection, doc, getDoc, setDoc, updateDoc } from "firebase/firestore"
 
-const SearchPanel = ({ places, onPlaceClick}) => {
+const SearchPanel = ({ places, onPlaceClick, onOpenModal }) => {
     if (!places || places.length === 0) {
         return <div style={{ padding: '20px', textAlign: 'center', color: 'gray' }}>검색 결과가 없습니다.</div>
     }
@@ -13,13 +13,14 @@ const SearchPanel = ({ places, onPlaceClick}) => {
     return (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             {places.map((place, index) => (
-                <li
-                    key={index}
-                    style={{ padding: '10px 15px', borderBottom: '1px solid #eee', cursor: 'pointer' }}
-                    onClick={() => onPlaceClick(place)}
-                >
-                    <strong style={{ fontSize: '16px' }}>{place.place_name}</strong>
-                    <p style={{ fontSize: '12px', color: 'gray', margin: '5px 0 0 0' }}>{place.address_name}</p>
+                <li key={index} style={{ padding: '10px 15px', borderBottom: '1px solid #eee' }}>
+                    <div onClick={() => onPlaceClick(place)} style={{ cursor: 'pointer' }}>
+                        <strong style={{ fontSize: '16px' }}>{place.place_name}</strong>
+                        <p style={{ fontSize: '12px', color: 'gray', margin: '5px 0 0 0' }}>{place.address_name}</p>
+                    </div>
+                    <button onClick={() => onOpenModal(place)} style={{ marginTop: '5px', padding: '3px 8px', fontSize: '12px' }}>
+                        My List 저장
+                    </button>
                 </li>
             ))}
         </ul>
@@ -29,6 +30,7 @@ const SearchPanel = ({ places, onPlaceClick}) => {
 const SaveModal = ({ place, isOpen, onClose, onSave }) => {
     const [menuName, setMenuName] = useState("")
     const [locationTag, setLocationTag] = useState("")
+    const [memo, setMemo] = useState("")
     const [userTags, setUserTags] = useState([])
 
     useEffect(() => {
@@ -52,12 +54,13 @@ const SaveModal = ({ place, isOpen, onClose, onSave }) => {
             return
         }
 
-        onSave(menuName, locationTag)
+        onSave(menuName, locationTag, memo)
     }
 
     const handleClose = () => {
         setMenuName("")
         setLocationTag("")
+        setMemo("")
         onClose()
     }
 
@@ -104,6 +107,11 @@ const SaveModal = ({ place, isOpen, onClose, onSave }) => {
                             style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', marginTop: '5px' }}
                         />
                     </div>
+                    <div style={{ marginBottom: '10px' }}>
+                        <label style={{ display: 'block', fontSize: '12px', marginBottom: '5px' }}>한 줄 메모(선택)</label>
+                        <textarea placeholder="예: 불맛이 최고!, 양이 많음" value={memo} onChange={(e) => setMemo(e.target.value)}
+                            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', height: '60px', resize: 'vertical' }} />
+                    </div>
                 </div>
 
                 <div style={{ marginTop: '20px', textAlign: 'right' }}>
@@ -128,7 +136,7 @@ const LocationTags = () => {
 }
 
 
-function MainApp({ currentUser, onLogout }) {
+function MainApp({ onLogout }) {
     // ('search', 'mylist', 'roulette')
     const [currentTab, setCurrentTab] = useState('search')
     const [isScriptLoaded, setIsScriptLoaded] = useState(false)
@@ -175,7 +183,7 @@ function MainApp({ currentUser, onLogout }) {
         })
     }
 
-    const handleSave = async (menuName, locationTag) => {
+    const handleSave = async (menuName, locationTag, memo) => {
         if (!auth.currentUser || !modalPlaceData) return
 
         const place = modalPlaceData
@@ -195,6 +203,7 @@ function MainApp({ currentUser, onLogout }) {
                 shop_id: place.id,
                 menu_name: menuName,
                 location_tag: locationTag,
+                memo: memo,
                 created_at: new Date()
             })
 
@@ -232,6 +241,7 @@ function MainApp({ currentUser, onLogout }) {
                     <SearchPanel
                         places={places}
                         onPlaceClick={handleSelectPlace}
+                        onOpenModal={handleOpenModal}
                     />
                 )
             case 'mylist':
@@ -239,7 +249,7 @@ function MainApp({ currentUser, onLogout }) {
             case 'roulette':
                 return <Roulette />
             default:
-                return <SearchPanel places={places} onPlaceClick={handleSelectPlace}/>
+                return <SearchPanel places={places} onPlaceClick={handleSelectPlace} onOpenModal={handleOpenModal}/>
         }
     }
 
@@ -293,7 +303,7 @@ function MainApp({ currentUser, onLogout }) {
             {/* 로그아웃 버튼 */}
             <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 11, background: 'white',
                 padding: '8px 12px', borderRadius: '20px', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }}>
-                <span style={{ marginRight: '10px', fontWeight: 'bold' }}>{currentUser.displayName}</span>
+                <span style={{ marginRight: '10px', fontWeight: 'bold' }}>{auth.currentUser.displayName}</span>
                 <button onClick={onLogout} style={{ background: 'none', border: 'none', color: '#007bff', cursor: 'pointer', fontWeight: 'bold' }}>
                     로그아웃
                 </button>
