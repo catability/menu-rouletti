@@ -423,6 +423,8 @@ function MainApp({ onLogout }) {
     const [places, setPlaces] = useState([])
     const [selectedPlace, setSelectedPlace] = useState(null)
 
+    const [mapCenter, setMapCenter] = useState(null)
+
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [modalPlaceData, setModalPlaceData] = useState(null)
 
@@ -476,8 +478,8 @@ function MainApp({ onLogout }) {
         try {
             await setDoc(doc(db, "Shops", place.id), {
                 shop_id: place.id,
-                name: place.place_name,
-                address: place.address_name,
+                place_name: place.place_name,
+                address_name: place.address_name,
                 x: place.x,
                 y: place.y
             })
@@ -546,6 +548,50 @@ function MainApp({ onLogout }) {
         })
     }, [isScriptLoaded])
 
+    const fetchShopByTag = useCallback(async (tagName) => {
+        if (!auth.currentUser) return []
+
+        try {
+            const menuListQuery = query(
+                collection(db, "MyMenuList"),
+                where("user_id", "==", auth.currentUser.uid),
+                where("location_tag", "==", tagName)
+            )
+            const menuListSnap = await getDocs(menuListQuery)
+
+            const shopIds = new Set()
+            menuListSnap.forEach(doc => {
+                shopIds.add(doc.data().shop_id)
+            })
+
+            if (shopIds.size === 0) return []
+
+            const shopsQuery = query(
+                collection(db, "Shops"),
+                where("shop_id", "in", [...shopIds])
+            )
+            const shopsSnap = await getDocs(shopsQuery)
+
+            return shopsSnap.docs.map(doc => doc.data())
+        } catch (error) {
+            console.error("태그별 가게 목록 로드 실패: ", error)
+            return []
+        }
+    }, [])
+
+    const handleLocationTagClick = useCallback(async (loc) => {
+        console.log("선택된 거점: ", loc)
+
+        const shops = await fetchShopByTag(loc.name)
+        console.log("shops: ", shops)
+        setPlaces(shops)
+        setSelectedPlace(null)
+
+        if (loc.lat && loc.lng) {
+            setMapCenter({ lat: loc.lat, lng: loc.lng })
+        }
+    }, [fetchShopByTag])
+
     const handleSelectPlace = useCallback((place) => {
         setSelectedPlace(place)
     }, [])
@@ -613,11 +659,12 @@ function MainApp({ onLogout }) {
                     places={places}
                     selectedPlace={selectedPlace}
                     onMarkerClick={handleSelectPlace}
+                    mapCenter={mapCenter}
                 />
             </div>
 
             {/* 거점 태그 */}
-            <LocationManager onTagClick={(loc) => console.log("선택된 거점: ", loc)} runPlaceSearch={runPlaceSearch}/>
+            <LocationManager onTagClick={handleLocationTagClick} runPlaceSearch={runPlaceSearch}/>
 
             {/* 로그아웃 버튼 */}
             <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 11, background: 'white',

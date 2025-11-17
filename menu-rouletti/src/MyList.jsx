@@ -53,7 +53,7 @@ function MyList() {
     const filteredList = myList.filter(item => {
         const searchText = filterText.toLowerCase()
 
-        const isShopMatch = item.shop.name.toLowerCase().includes(searchText)
+        const isShopMatch = item.shop.place_name.toLowerCase().includes(searchText)
         const isMenuMatch = item.menu_name.toLowerCase().includes(searchText)
         const isTagMatch = item.location_tag.toLowerCase().includes(searchText)
         // const isMemoMatch = item.memo?.toLowerCase().includes(searchText) || false

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-function MapContainer({ places, selectedPlace, onMarkerClick }) {
+function MapContainer({ places, selectedPlace, onMarkerClick, mapCenter }) {
     const mapRef = useRef(null)
     const mapInstanceRef = useRef(null)
     const infoWindowRef = useRef(null)
@@ -29,6 +29,14 @@ function MapContainer({ places, selectedPlace, onMarkerClick }) {
             console.error("카카오맵 API가 로드되지 않았습니다.")
         }
     }, [])
+    
+    useEffect(() => {
+        const map = mapInstanceRef.current
+        if (!map || !mapCenter) return
+
+        const position = new kakao.maps.LatLng(mapCenter.lat, mapCenter.lng)
+        map.panTo(position)
+    }, [mapCenter])
 
     useEffect(() => {
         const map = mapInstanceRef.current
