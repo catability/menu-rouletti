@@ -154,9 +154,95 @@ const SaveModal = ({ place, isOpen, onClose, onSave }) => {
     )
 }
 
-const LocationManager = ({ onTagClick }) => {
+const LocationEditForm = ({ location, onSearch, onSave, onCancel }) => {
+    const [name, setName] = useState(location.name)
+    const [searchText, setSearchText] = useState(location.address || "")
+    const [searchResults, setSearchResults] = useState([])
+    const [isLoading, setIsLoading] = useState(false)
+    const [selectedPlace, setSelectedPlace] = useState(null)
+
+    const handleSearch = async () => {
+        setIsLoading(true)
+        setSearchResults([])
+        try {
+            const results = await onSearch(searchText)
+            setSearchResults(results)
+        } catch (error) {
+            console.error(error)
+            alert("주소 검색에 실패했습니다.")
+        }
+        setIsLoading(false)
+    }
+
+    const handleResultClick = (place) => {
+        setSearchText(place.address_name)
+        setSelectedPlace(place)
+        setSearchResults([])
+    }
+
+    const handleSave = () => {
+        const updateData = {
+            name: name,
+            lat: selectedPlace ? selectedPlace.y : location.lat,
+            lng: selectedPlace ? selectedPlace.x : location.lng,
+            address: selectedPlace ? selectedPlace.address_name : location.address
+        }
+        onSave(location.id, updateData)
+    }
+    
+    return (
+        <div style={{ padding: '20px' }}>
+            <h4 style={{ margin: '0 0 20px 0' }}>'{location.name}' 거점 수정</h4>
+
+            {/* 이름 수정 */}
+            <div style={{ marginBottom: '15px' }}>
+                <label style={{ fontSize: '12px', display: 'block', marginBottom: '5px' }}>거점 이름</label>
+                <input type="text" value={name} onChange={(e) => setName(e.target.value)}
+                    style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} />
+            </div>
+
+            {/* 위치 검색 */}
+            <div style={{ marginBottom: '15px' }}>
+                <label style={{ fontSize: '12px', display: 'block', marginBottom: '5px' }}></label>
+                <div style={{ display: 'flex', gap: '5px' }}>
+                    <input type="text" placeholder="주소나 장소명 검색" value={searchText} onChange={(e) => setSearchText(e.target.value)}
+                    onKeyUp={(e) => e.key === 'Enter' && handleSearch()} style={{ flex: 1, padding: '8px', boxSizing: 'border-box' }} />
+                    <button onClick={handleSearch} disabled={isLoading} style={{ whiteSpace: 'nowrap' }}>
+                        {isLoading ? '검색중...' : '주소 검색'}
+                    </button>
+                </div>
+            </div>
+
+            {/* 검색 결과 */}
+            {searchResults.length > 0 && (
+                <ul style={{ border: '1px solid #ccc', margin: 0, padding: 0, listStyle: 'none', maxHeight: '150px', overflowY: 'auto', borderRadius: '4px' }}>
+                    {searchResults.map(place => (
+                        <li key={place.id} onClick={() => handleResultClick(place)}
+                            style={{ padding: '8px', borderBottom: '1px solid #eee', cursor: 'pointer' }}>
+                            <strong>{place.place_name}</strong>
+                            <p style={{ fontSize: '12px', color: 'gray', margin: '4px 0 0 0' }}>{place.address_name}</p>
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            {selectedPlace && (
+                <p style={{ fontSize: '12px', color: 'blue', margin: '5px 0 0 0' }}>선택됨: {selectedPlace.place_name}</p>
+            )}
+
+            {/* 하단 버튼 */}
+            <div style={{ marginTop: '20px', textAlign: 'right', display: 'flex', justifyContent: 'space-between' }}>
+                <button onClick={onCancel} style={{ background: 'none', color: 'gray', border: '1px solid #ddd', padding: '8px 12px' }}>취소</button>
+                <button onClick={handleSave} style={{ background: '#007bff', color: 'white', border: 'none', padding: '8px 16px' }}>저장</button>
+            </div>
+        </div>
+    )
+}
+
+const LocationManager = ({ onTagClick, runPlaceSearch }) => {
     const [locations, setLocations] = useState([])
     const [isModalOpen, setIsModalOpen] = useState(false)
+    const [editingLocation, setEditingLocation] = useState(null)
 
     useEffect(() => {
         const fetchLocationsAndCounts = async () => {
@@ -201,12 +287,69 @@ const LocationManager = ({ onTagClick }) => {
         // onSnapshot 리스너를 사용하는 것을 고려해볼 수 있습니다.
     }, [])
 
+    const handleUpdateLocation = async (locationId, updatedData) => {
+        if (!auth.currentUser) return
+
+        const userRef = doc(db, "Users", auth.currentUser.uid)
+        let currentLocations = []
+
+        try {
+            const userSnap = await getDoc(userRef)
+            if (userSnap.exists()) {
+                currentLocations = userSnap.data().locations || []
+            }
+
+            const newLocations = currentLocations.map(loc => {
+                if (loc.id === locationId) {
+                    return {
+                        ...loc,
+                        ...updatedData
+                    }
+                }
+                return loc
+            })
+
+            await updateDoc(userRef, {
+                locations: newLocations
+            })
+
+            const updatedLocalLocations = locations.map(loc => {
+                if (loc.id === locationId) {
+                    return { ...loc, ...updatedData}
+                }
+                return loc
+            })
+
+            setLocations(updatedLocalLocations.sort((a, b) => a.order - b.order))
+
+            alert("수정되었습니다.")
+            setEditingLocation(null)
+        } catch (error) {
+            console.error("거점 정보 업데이트 실패: ", error)
+            alert("수정에 실패했습니다.")
+        }
+    }
+
     const renderManagementModal = () => {
         if (!isModalOpen) return null
 
+        const baseModalStyle = {
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '400px', background: 'white', border: '1px solid #ccc',
+            borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 100
+        }
+
+        if (editingLocation) {
+            return (
+                <div style={baseModalStyle}>
+                    <LocationEditForm
+                        location={editingLocation} onSearch={runPlaceSearch} onSave={handleUpdateLocation} onCancel={() => setEditingLocation(null)}
+                    />
+                </div>
+            )
+        }
+
         return (
-            <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '400px', background: 'white', border: '1px solid #ccc',
-                        borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 100 }}>
+            <div style={baseModalStyle}>
                 <h2 style={{ padding: '15px 20px', margin: 0, borderBottom: '1px solid #eee', fontSize: '18px',
                             display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                 >
@@ -217,7 +360,7 @@ const LocationManager = ({ onTagClick }) => {
                     </button>
                 </h2>
 
-                <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: '400px', overflowY: 'auto'}}>
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: '400px', overflowY: 'auto' }}>
                     {locations.map(loc => (
                         <li key={loc.id} style={{ display: 'flex', alignItems: 'center', padding: '15px 20px', borderBottom: '1px solid #eee'}}>
                             <div style={{ flex: 1, marginRight: '10px' }}>
@@ -228,7 +371,7 @@ const LocationManager = ({ onTagClick }) => {
                                     {loc.address || "위치 미설정"}
                                 </p>
                             </div>
-                            <button onClick={() => console.log("수정 클릭: ", loc)}
+                            <button onClick={() => setEditingLocation(loc)}
                                 style={{ fontSize: '12px', padding: '4px 8px', marginRight: '5px' }}>
                                 수정
                             </button>
@@ -380,6 +523,29 @@ function MainApp({ onLogout }) {
         }
     }
 
+    const runPlaceSearch = useCallback((searchText) => {
+        if (!isScriptLoaded) {
+            return Promise.reject(new Error("맵 스크립트가 로드되지 않았습니다."))
+        }
+        if (!searchText.trim()) {
+            return Promise.resolve([])
+        }
+
+        const ps = new kakao.maps.services.Places()
+
+        return new Promise((resolve, reject) => {
+            ps.keywordSearch(searchText, (data, status) => {
+                if (status === kakao.maps.services.Status.OK) {
+                    resolve(data)
+                } else if(status === kakao.maps.services.Status.ZERO_RESULT) {
+                    resolve([])
+                } else {
+                    reject(new Error("검색 중 오류가 발생했습니다."))
+                }
+            })
+        })
+    }, [isScriptLoaded])
+
     const handleSelectPlace = useCallback((place) => {
         setSelectedPlace(place)
     }, [])
@@ -451,7 +617,7 @@ function MainApp({ onLogout }) {
             </div>
 
             {/* 거점 태그 */}
-            <LocationManager onTagClick={(loc) => console.log("선택된 거점: ", loc)}/>
+            <LocationManager onTagClick={(loc) => console.log("선택된 거점: ", loc)} runPlaceSearch={runPlaceSearch}/>
 
             {/* 로그아웃 버튼 */}
             <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 11, background: 'white',
